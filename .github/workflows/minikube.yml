@@ -26,33 +26,49 @@ jobs:
 
       - name: Setup StackRox Central
         run: |
-          helm repo add stackrox https://stackrox.io
+          helm repo add stackrox https://raw.githubusercontent.com/stackrox/helm-charts/main/opensource/
           helm repo update
       
       - name: Deploy StackRox Central
         run: |
-          helm install stackrox-central-services stackrox/stackrox-central-services \
-          --namespace stackrox --create-namespace \
-          --set system.profile=small \
-          --set central.resources.requests.cpu="200m" \
-          --set central.resources.requests.memory="512Mi" \
-          --set central.resources.limits.cpu="1" \
-          --set central.resources.limits.memory="1.5Gi" \
-          --set scannerV4.db.resources.requests.cpu="200m" \
-          --set scannerV4.db.resources.requests.memory="512Mi" \
-          --set scannerV4.db.resources.limits.memory="1.5Gi" \
-          --set scannerV4.indexer.resources.requests.cpu="100m" \
-          --set scannerV4.indexer.resources.requests.memory="256Mi" \
-          --set scannerV4.matcher.resources.requests.cpu="100m" \
-          --set scannerV4.matcher.resources.requests.memory="256Mi" \
+          helm upgrade --install -n stackrox --create-namespace stackrox-central-services \
+          stackrox/stackrox-central-services \
+          --set central.adminPassword.value="helloworld" \
+          --set central.persistence.none="true" \
+          --set central.resources.requests.memory=1Gi \
+          --set central.resources.requests.cpu=1 \
+          --set central.resources.limits.memory=2Gi \
+          --set central.resources.limits.cpu=1 \
+          --set central.db.resources.requests.memory=1Gi \
+          --set central.db.resources.requests.cpu=500m \
+          --set central.db.resources.limits.memory=2Gi \
+          --set central.db.resources.limits.cpu=1 \
+          --set scanner.autoscaling.disable=true \
+          --set scanner.replicas=1 \
+          --set scanner.resources.requests.memory=500Mi \
+          --set scanner.resources.requests.cpu=500m \
+          --set scanner.resources.limits.memory=2500Mi \
+          --set scanner.resources.limits.cpu=2000m
 
-      - name: Wait for StackRox Ready
+      - name: Wait for StackRox Central rollout
         run: |
-          echo "Waiting for pods to initialize..."
-          kubectl rollout status deployment/central -n stackrox --timeout=300s
+          echo "Waiting for Central deployments to be available..."
+          kubectl rollout status deployment/central -n stackrox --timeout=10m
+          kubectl rollout status deployment/central-db -n stackrox --timeout=10m
+          kubectl rollout status deployment/scanner -n stackrox --timeout=10m
+          kubectl rollout status deployment/scanner-db -n stackrox --timeout=10m
+          echo "All Central deployments are available!"
+      
+      - name: Check StackRox Central status
+        run: |
           kubectl get pods -n stackrox
-
-      - name: Fetch StackRox Admin Password
+          kubectl get services -n stackrox
+          kubectl get deployments -n stackrox
+          kubectl get statefulsets -n stackrox
+          kubectl get all -n stackrox
+      
+      - name: Scan a test image
         run: |
-          PASSWORD=$(kubectl -n stackrox get secret central-htpasswd -o jsonpath="{.data.password}" | base64 --decode)
-          echo $PASSWORD
+          kubectl run -n stackrox test-scan --image=alpine:latest -- sleep 3600
+          sleep 30
+          kubectl logs -n stackrox -l app=scanner -c scanner | grep "Scan completed for image alpine:latest"
