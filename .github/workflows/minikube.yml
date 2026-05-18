@@ -23,3 +23,36 @@ jobs:
     
       - name: Try the cluster!
         run: kubectl get pods -A
+
+      - name: Setup StackRox Central
+        run: |
+          helm repo add stackrox https://stackrox.io
+          helm repo update
+      
+      - name: Deploy StackRox Central
+        run: |
+          helm install stackrox-central-services stackrox/stackrox-central-services \
+          --namespace stackrox --create-namespace \
+          --set system.profile=small \
+          --set central.resources.requests.cpu="200m" \
+          --set central.resources.requests.memory="512Mi" \
+          --set central.resources.limits.cpu="1" \
+          --set central.resources.limits.memory="1.5Gi" \
+          --set scannerV4.db.resources.requests.cpu="200m" \
+          --set scannerV4.db.resources.requests.memory="512Mi" \
+          --set scannerV4.db.resources.limits.memory="1.5Gi" \
+          --set scannerV4.indexer.resources.requests.cpu="100m" \
+          --set scannerV4.indexer.resources.requests.memory="256Mi" \
+          --set scannerV4.matcher.resources.requests.cpu="100m" \
+          --set scannerV4.matcher.resources.requests.memory="256Mi" \
+
+      - name: Wait for StackRox Ready
+        run: |
+          echo "Waiting for pods to initialize..."
+          kubectl rollout status deployment/central -n stackrox --timeout=300s
+          kubectl get pods -n stackrox
+
+      - name: Fetch StackRox Admin Password
+        run: |
+          PASSWORD=$(kubectl -n stackrox get secret central-htpasswd -o jsonpath="{.data.password}" | base64 --decode)
+          echo $PASSWORD
