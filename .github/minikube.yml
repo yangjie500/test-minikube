@@ -1,0 +1,15 @@
+name: StackRox on Minikube Test
+
+on: [push, pull_request]
+
+jobs:
+  stackrox-ci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Maximize Runner Space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          df -h
