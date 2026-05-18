@@ -13,3 +13,13 @@ jobs:
           sudo rm -rf /opt/ghc
           sudo rm -rf "/usr/local/share/boost"
           df -h
+      
+      - name: Start Minikube
+        uses: medyagh/setup-minikube@master
+        with:
+          cpus: 2
+          memory: 5000mb
+          driver: docker
+    
+      - name: Try the cluster!
+        run: kubectl get pods -A
